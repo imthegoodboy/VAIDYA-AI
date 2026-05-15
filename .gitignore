@@ -1,0 +1,10 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+chroma_db/
+vector_store/
+node_modules/
+dist/
+*.log
