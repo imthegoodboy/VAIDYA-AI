@@ -14,7 +14,6 @@ import {
   deleteJson,
   getJson,
   postJson,
-  postPublicJson,
   uploadFiles,
   type MessageItem,
   type AgentStep,
@@ -148,10 +147,8 @@ function ChatApp() {
   const createSession = useCallback(async (authToken: string) => {
     const created = await postJson<{ id: string }>("/sessions/", {}, authToken);
     setActiveSessionId(created.id);
-    setMessages([]);
-    await refreshSessions(authToken);
     return created.id;
-  }, [refreshSessions]);
+  }, []);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -165,7 +162,9 @@ function ChatApp() {
           setActiveSessionId(list[0].id);
           await withFreshToken((authToken) => loadMessages(list[0].id, authToken));
         } else {
-          await withFreshToken((authToken) => createSession(authToken));
+          setActiveSessionId(null);
+          setMessages([]);
+          setPhotosByMessageId({});
         }
       } catch (exc) {
         if (!cancelled) setError(friendlyError(exc));
@@ -175,7 +174,7 @@ function ChatApp() {
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, isSignedIn, withFreshToken, refreshSessions, loadMessages, createSession, friendlyError]);
+  }, [isLoaded, isSignedIn, withFreshToken, refreshSessions, loadMessages, friendlyError]);
 
   const handleSelectSession = useCallback(async (id: string) => {
     setError("");
@@ -187,14 +186,13 @@ function ChatApp() {
     }
   }, [withFreshToken, loadMessages, friendlyError]);
 
-  const handleNewChat = useCallback(async () => {
+  const handleNewChat = useCallback(() => {
     setError("");
-    try {
-      await withFreshToken((authToken) => createSession(authToken));
-    } catch (exc) {
-      setError(friendlyError(exc));
-    }
-  }, [withFreshToken, createSession, friendlyError]);
+    setActiveSessionId(null);
+    setMessages([]);
+    setPhotosByMessageId({});
+    setAgentSteps([]);
+  }, []);
 
   const handleDeleteSession = useCallback(async (id: string) => {
     if (deletingSessionId) return;
@@ -228,16 +226,20 @@ function ChatApp() {
 
   const loadUnsplashForMessage = useCallback(async (userText: string, message: ChatMessage) => {
     try {
-      const intent = await postPublicJson<UnsplashIntent>("/unsplash/intent", { text: `${userText}\n\n${message.content}` });
+      const intent = await withFreshToken((freshToken) =>
+        postJson<UnsplashIntent>("/unsplash/intent", { text: `${userText}\n\n${message.content}` }, freshToken)
+      );
       if (!intent.show_images || !intent.keyword) return;
-      const photos = await postPublicJson<UnsplashPhoto[]>("/unsplash/search", { keyword: intent.keyword, per_page: 3 });
+      const photos = await withFreshToken((freshToken) =>
+        postJson<UnsplashPhoto[]>("/unsplash/search", { keyword: intent.keyword, per_page: 3 }, freshToken)
+      );
       if (photos.length) {
         setPhotosByMessageId((prev) => ({ ...prev, [message.id]: photos }));
       }
     } catch {
       // Unsplash is decorative; chat should stay quiet if it is unavailable.
     }
-  }, []);
+  }, [withFreshToken]);
 
   const handleStop = useCallback(() => {
     abortController?.abort();
@@ -336,6 +338,7 @@ function ChatApp() {
       <ChatHeader
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+        onNewChat={handleNewChat}
         voiceReplies={voiceReplies}
         onToggleVoiceReplies={() => setVoiceReplies((enabled) => !enabled)}
       />

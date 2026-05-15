@@ -1,12 +1,13 @@
 "use client";
 
-import { PanelLeftClose, PanelLeftOpen, Leaf, Sprout, Volume2, VolumeX, Sparkles } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, Plus, Leaf, Sprout, Volume2, VolumeX, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 
 interface ChatHeaderProps {
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
+  onNewChat: () => void;
   voiceReplies: boolean;
   onToggleVoiceReplies: () => void;
 }
@@ -14,6 +15,7 @@ interface ChatHeaderProps {
 export function ChatHeader({
   sidebarOpen,
   onToggleSidebar,
+  onNewChat,
   voiceReplies,
   onToggleVoiceReplies,
 }: ChatHeaderProps) {
@@ -23,6 +25,11 @@ export function ChatHeader({
         <button onClick={onToggleSidebar} className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all duration-200" aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}>
           {sidebarOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeftOpen className="w-5 h-5" />}
         </button>
+        {!sidebarOpen && (
+          <button onClick={onNewChat} className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all duration-200" aria-label="New chat" title="New chat">
+            <Plus className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
@@ -43,7 +50,7 @@ export function ChatHeader({
           <Sparkles className="w-3.5 h-3.5" />
           Prakriti
         </Link>
-        <UserButton afterSignOutUrl="/" />
+        <UserButton />
       </div>
     </header>
   );

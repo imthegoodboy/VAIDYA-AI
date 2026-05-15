@@ -133,17 +133,6 @@ export async function postJson<T>(
   return (await parseResponse(response)) as T
 }
 
-export async function postPublicJson<T>(path: string, body: unknown): Promise<T> {
-  const response = await fetch(apiUrl(path), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  })
-  return (await parseResponse(response)) as T
-}
-
 export async function deleteJson(path: string, token: string) {
   const response = await fetch(apiUrl(path), {
     method: "DELETE",

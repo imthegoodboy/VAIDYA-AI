@@ -1,0 +1,4 @@
+interface:
+  display_name: "Production Readiness Review"
+  short_description: "Audit apps before production release"
+  default_prompt: "Use $production-readiness-review to audit this app before release."

@@ -82,15 +82,17 @@ function AttachmentPreview({ file, token }: { file: SourceItem; token: string })
 
   useEffect(() => {
     let cancelled = false;
+    let objectUrl = "";
     if (!file.url || !token || !file.mime_type?.startsWith("image/")) return;
     fetchAuthedBlob(file.url, token)
       .then((url) => {
+        objectUrl = url;
         if (!cancelled) setBlobUrl(url);
       })
       .catch(() => undefined);
     return () => {
       cancelled = true;
-      if (blobUrl) URL.revokeObjectURL(blobUrl);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [file.url, file.mime_type, token]);
 

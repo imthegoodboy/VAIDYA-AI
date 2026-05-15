@@ -6,7 +6,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from app.ingest.herb_formatter import herb_record_to_document
-from app.memory import PostgresSummaryMemoryStore
+from app.memory import (
+    PostgresSummaryMemoryStore,
+    memory_delta_for_turn,
+    should_extract_summary_delta,
+)
 from app.llm import client as llm_client
 from app.llm.agent_base import has_required_prompt_sections
 from app.llm.agents import (
@@ -94,6 +98,33 @@ class TestSeparateAgents(unittest.TestCase):
         )
         self.assertIn("concise answers", result)
         self.assertIn("testing the app", result)
+
+    def test_memory_delta_can_be_extracted_on_first_personal_turn(self) -> None:
+        def fake_session_query(
+            messages: list[dict[str, object]],
+            summary: str | None,
+            fallback: str,
+        ) -> tuple[str, str]:
+            return fallback, "User's name is Parth."
+
+        delta = memory_delta_for_turn(
+            [{"role": "user", "content": "my name is Parth"}],
+            None,
+            "my name is Parth",
+            "",
+            session_query_runner=fake_session_query,
+        )
+        self.assertEqual(delta, "User's name is Parth.")
+
+    def test_memory_delta_skips_plain_first_turn_question(self) -> None:
+        self.assertFalse(should_extract_summary_delta("tell me about tulsi"))
+        delta = memory_delta_for_turn(
+            [{"role": "user", "content": "tell me about tulsi"}],
+            None,
+            "tell me about tulsi",
+            "",
+        )
+        self.assertEqual(delta, "")
 
     def test_old_agent_files_are_gone(self) -> None:
         old_agent_dir = "age" + "nts"

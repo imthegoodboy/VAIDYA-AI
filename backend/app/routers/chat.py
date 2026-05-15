@@ -1,9 +1,10 @@
 from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app import rag
+from app.services.auth import AuthUser, require_clerk_user
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -31,7 +32,10 @@ class ChatResponse(BaseModel):
 
 
 @router.post("/", response_model=ChatResponse)
-def chat_endpoint(body: ChatRequest):
+def chat_endpoint(
+    body: ChatRequest,
+    _auth_user: AuthUser = Depends(require_clerk_user),
+):
     msgs: list[dict[str, Any]] = [m.model_dump() for m in body.messages]
     try:
         answer, sources = rag.chat_with_rag(msgs, language=body.language)

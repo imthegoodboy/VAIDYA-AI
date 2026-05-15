@@ -1,28 +1,23 @@
-# 🌿 Vaidya AI
+# Vaidya AI
 
-Ayurveda RAG chat with plant image detection, document uploads, Tavily verification, Clerk login, Postgres chat history, Redis cache, and a Next.js frontend.
+Ayurveda RAG chat with plant image detection, document uploads, Tavily verification, Clerk login, chat history, optional Redis cache, Chroma indexing, and a Next.js frontend.
 
-Docker is intentionally small now. It starts only Postgres and Redis. Run the backend and `fronteend-1` locally so development stays fast and simple.
+This repo is local-first. Run the backend and `fronteend-1` directly on your machine.
 
-## 🚀 Run It
+## Run Locally
 
-Step 1
-
-```powershell
-docker compose up -d
-```
-
-Step 2
+Backend:
 
 ```powershell
 cd backend
+python -m venv .venv
+.\.venv\Scripts\python -m pip install -r requirements.txt
 copy .env.example .env
-.\.venv\Scripts\pip install -r requirements.txt
 .\.venv\Scripts\python -m app.ingest_cli --clear --url-limit 0
 .\.venv\Scripts\uvicorn.exe app.main:app --host 127.0.0.1 --port 5500 --reload
 ```
 
-Step 3
+Frontend:
 
 ```powershell
 cd fronteend-1
@@ -31,17 +26,31 @@ npm install
 npm run dev
 ```
 
+For backend tests, install the dev requirements once:
+
+```powershell
+cd backend
+.\.venv\Scripts\python -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python -m pytest
+```
+
 Open the Next.js URL printed by `npm run dev`.
 
-## 🔐 Auth
+## Local Data
 
-The frontend uses Clerk.
+The default backend env uses SQLite at `backend/ragchat.db` so the app can run locally without a separate database service.
 
-Each backend request sends the Clerk bearer token.
+For production or a local Postgres service, set `DATABASE_URL` in `backend/.env`:
 
-The backend stores sessions with the Clerk user id.
+```env
+DATABASE_URL=postgresql+psycopg://rag:rag@127.0.0.1:5432/ragchat
+```
 
-One user cannot list, open, delete, upload to, or chat inside another user session.
+Redis is optional locally. Set `REDIS_URL=redis://127.0.0.1:6379/0` only when you are running Redis yourself.
+
+## Auth
+
+The frontend uses Clerk. Each backend request sends the Clerk bearer token, and the backend stores sessions with the Clerk user id.
 
 Frontend env:
 
@@ -60,27 +69,11 @@ CLERK_JWKS_URL=
 
 `CLERK_JWKS_URL` can stay empty when `CLERK_ISSUER` is set.
 
-## 💬 Chat
+## Chat
 
-New chats get a useful name from the first message.
+New chats get a useful name from the first message. Uploads can include plant images, medicine photos, PDFs, text files, and markdown files.
 
-The user message appears first.
-
-Then the model thinks.
-
-Then the assistant answer appears.
-
-Uploads can include plant images, medicine photos, PDFs, text files, and markdown files.
-
-## 🎙️ Voice
-
-The mic button turns speech into text in the chat box.
-
-The speaker button reads assistant replies aloud.
-
-The text answer still stays on screen, so voice never hides the actual response.
-
-## 🧠 Backend
+## Backend
 
 FastAPI handles:
 
@@ -93,50 +86,15 @@ Plant vision
 Prescription and document parsing
 Upload jobs
 Tavily verification
-Postgres messages
+Chat history
 Chroma indexing
 ```
 
-## 🧱 Docker
-
-Only infrastructure runs in Docker:
-
-```text
-Postgres  localhost:5432
-Redis     localhost:6379
-```
-
-Backend and frontend run from the host.
-
-## 📁 Folders
+## Folders
 
 ```text
 backend      FastAPI RAG backend
 fronteend-1  Active Next.js frontend
 data         Source documents
 vector_store Chroma database
-```
-
-The old `frontend` folder is deleted.
-
-## 📋 Copy These
-
-Start database and cache:
-
-```powershell
-docker compose up -d
-```
-
-Backend:
-
-```powershell
-cd backend
-.\.venv\Scripts\uvicorn.exe app.main:app --host 127.0.0.1 --port 5500 --reload
-```
-
-Frontend:
-
-```powershell
-cd fronteend-1
-npm run dev
 ```

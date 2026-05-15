@@ -1,10 +1,17 @@
 .env
+backend/.env
+fronteend-1/.env.local
 .venv/
 venv/
 __pycache__/
 *.pyc
 chroma_db/
 vector_store/
+books/
 node_modules/
 dist/
 *.log
+backend/ragchat.db
+backend/uploads/
+fronteend-1/.next/
+fronteend-1/tsconfig.tsbuildinfo

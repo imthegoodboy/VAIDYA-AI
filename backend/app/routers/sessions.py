@@ -128,7 +128,10 @@ def list_sessions(
 ):
     stmt = (
         select(ChatSession)
-        .where(ChatSession.clerk_user_id == auth_user.clerk_user_id)
+        .where(
+            ChatSession.clerk_user_id == auth_user.clerk_user_id,
+            ChatSession.messages.any(),
+        )
         .order_by(ChatSession.updated_at.desc(), ChatSession.created_at.desc())
         .limit(min(limit, 100))
     )

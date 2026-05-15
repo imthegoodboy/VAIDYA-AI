@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.config import settings
 from app.llm.tasks import run_unsplash_intent_agent
+from app.services.auth import AuthUser, require_clerk_user
 
 router = APIRouter(prefix="/unsplash", tags=["unsplash"])
 
@@ -49,7 +50,10 @@ class UnsplashPhoto(BaseModel):
 
 
 @router.post("/intent", response_model=UnsplashIntentResponse)
-def unsplash_intent(body: UnsplashIntentRequest):
+def unsplash_intent(
+    body: UnsplashIntentRequest,
+    _auth_user: AuthUser = Depends(require_clerk_user),
+):
     raw = (body.text or "").strip()[:4000]
     if not raw:
         return UnsplashIntentResponse(show_images=False, keyword="")
@@ -73,7 +77,10 @@ def unsplash_intent(body: UnsplashIntentRequest):
 
 
 @router.post("/search", response_model=list[UnsplashPhoto])
-def unsplash_search(body: UnsplashSearchRequest):
+def unsplash_search(
+    body: UnsplashSearchRequest,
+    _auth_user: AuthUser = Depends(require_clerk_user),
+):
     keyword = " ".join((body.keyword or "").strip().split()[:4])
     if not keyword:
         return []

@@ -10,6 +10,11 @@ from app.routers import chat, health, ingest, sessions, unsplash_intent, prakrit
 logging.basicConfig(level=logging.INFO)
 
 
+def _cors_origins() -> list[str]:
+    origins = [origin.strip() for origin in settings.cors_origins.split(",")]
+    return [origin for origin in origins if origin]
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     settings.data_dir.mkdir(parents=True, exist_ok=True)
@@ -27,7 +32,7 @@ app = FastAPI(title="Multilingual RAG API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

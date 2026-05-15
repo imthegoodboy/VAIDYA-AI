@@ -2,25 +2,43 @@
 
 FastAPI RAG backend for Vaidya AI.
 
-It handles Clerk auth, user-owned chat sessions, Chroma retrieval, OpenAI chat and vision agents, plant image detection, prescription or document uploads, Tavily verification, Postgres history, and optional Redis query caching.
+It handles Clerk auth, user-owned chat sessions, Chroma retrieval, OpenAI chat and vision agents, plant image detection, prescription or document uploads, Tavily verification, chat history, and optional Redis query caching.
 
 ## Setup
 
 ```powershell
 cd backend
 python -m venv .venv
-.\.venv\Scripts\pip install -r requirements.txt
+.\.venv\Scripts\python -m pip install -r requirements.txt
 copy .env.example .env
 ```
 
-Set these in `backend/.env`:
+For tests:
+
+```powershell
+.\.venv\Scripts\python -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python -m pytest
+```
+
+The default `.env.example` uses local SQLite:
 
 ```env
-DATABASE_URL=postgresql+psycopg://rag:rag@127.0.0.1:5432/ragchat
-REDIS_URL=redis://127.0.0.1:6379/0
+DATABASE_URL=sqlite:///./ragchat.db
 CHROMA_PATH=../vector_store
 OPENAI_API_KEY=
 CLERK_ISSUER=
+```
+
+For production or a local Postgres service, set:
+
+```env
+DATABASE_URL=postgresql+psycopg://rag:rag@127.0.0.1:5432/ragchat
+```
+
+Redis is optional locally:
+
+```env
+REDIS_URL=redis://127.0.0.1:6379/0
 ```
 
 ## Run
@@ -42,16 +60,6 @@ Use this for the full URL list from `data/Linkss.txt`:
 ```powershell
 .\.venv\Scripts\python -m app.ingest_cli --clear
 ```
-
-## Docker
-
-From the repo root:
-
-```powershell
-docker compose up -d
-```
-
-Docker starts only Postgres and Redis. Run ingest and the API from this folder.
 
 ## Routes
 
