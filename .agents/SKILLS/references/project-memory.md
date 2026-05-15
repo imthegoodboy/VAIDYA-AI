@@ -11,7 +11,7 @@ Use this file for durable AI Vaidya project knowledge that future agents should 
 - Keep the repo local-first: backend and frontend should run directly on the machine, with no container-based development path.
 - Backend local dev defaults to SQLite at `sqlite:///./ragchat.db`; use Postgres only when a real deployed or local database service is intentionally configured.
 - Backend tests require `backend/requirements-dev.txt`; run `python -m pytest` from `backend/` after installing it.
-- Frontend release checks are `npm run lint`, `npx tsc --noEmit`, and `npm run build` from `fronteend-1/`.
+- Frontend release checks are `npm run lint`, `npx tsc --noEmit`, and `npm run build` from `fronteend-1/`; `npm run lint` is a zero-warning gate.
 
 ## Add New Lessons Here
 

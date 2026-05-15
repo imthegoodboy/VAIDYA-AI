@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import Image from "next/image";
 
 const regions = [
   { name: "Charaka Samhita", nodes: 120, status: "indexed" },
@@ -52,9 +53,12 @@ export function TraditionsSection() {
             <div className={`w-48 lg:w-72 xl:w-80 shrink-0 transition-all duration-1000 ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
             }`}>
-              <img
+              <Image
                 src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/world-3i68QNWJwmO7W19ztZWbevAwJQHzYL.png"
                 alt="Global network sphere"
+                width={640}
+                height={640}
+                sizes="(min-width: 1280px) 320px, (min-width: 1024px) 288px, 192px"
                 className="w-full h-full object-contain object-center"
               />
             </div>

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Leaf, MessageSquare, Sprout, LogOut, Sparkles, ArrowRight,
+  Leaf, MessageSquare, Sprout, LogOut, Sparkles,
   Cpu, Loader2, Zap,
 } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -64,7 +64,12 @@ export default function PrakritiPage() {
     }
   }, [getAuthToken]);
 
-  useEffect(() => { refreshHistory(); }, [refreshHistory]);
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      void refreshHistory();
+    }, 0);
+    return () => clearTimeout(timeout);
+  }, [refreshHistory]);
 
   const handleComplete = async (ans: Record<number, Dosha>) => {
     setAnswers(ans);

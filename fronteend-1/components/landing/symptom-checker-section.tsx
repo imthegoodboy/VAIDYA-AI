@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 
 const features = [
   { 
@@ -46,11 +47,13 @@ export function SymptomCheckerSection() {
           isVisible ? "opacity-100" : "opacity-0"
         }`}
       >
-        <img
+        <Image
           src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Upscaled%20Image%20%2813%29-OQ2DiR3ElVsUg8kTvTL1kC5A3Q6maM.png"
           alt=""
           aria-hidden="true"
-          className="w-full h-full object-cover object-left-top"
+          fill
+          sizes="55vw"
+          className="object-cover object-left-top"
         />
         {/* Fade left edge */}
         <div className="absolute inset-0 bg-gradient-to-r from-background via-background/60 to-transparent" />

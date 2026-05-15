@@ -37,7 +37,8 @@ export default function PlantDetailPage({
   const plant = plants.find((p) => p.id === id);
 
   useEffect(() => {
-    setIsVisible(true);
+    const frame = requestAnimationFrame(() => setIsVisible(true));
+    return () => cancelAnimationFrame(frame);
   }, []);
 
   // Auto-rotate images every 4 seconds

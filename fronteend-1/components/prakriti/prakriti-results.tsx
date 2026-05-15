@@ -89,7 +89,10 @@ function DoshaRing({
 export function PrakritiResults({ answers, onRetake }: PrakritiResultsProps) {
   const { percentages, primary, secondary, isDual, prakritiName } = calculateResults(answers);
   const [isVisible, setIsVisible] = useState(false);
-  useEffect(() => { setIsVisible(true); }, []);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setIsVisible(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   const profile = doshaProfiles[primary];
   const secondaryProfile = doshaProfiles[secondary];

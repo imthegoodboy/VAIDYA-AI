@@ -4,6 +4,11 @@ import { useRef, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
+function seededUnit(index: number, salt: number) {
+  const value = Math.sin(index * 12.9898 + salt * 78.233) * 43758.5453;
+  return value - Math.floor(value);
+}
+
 function SandField() {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const count = 1500;
@@ -14,11 +19,11 @@ function SandField() {
     const offsets = new Float32Array(count);
 
     for (let i = 0; i < count; i++) {
-      positions[i * 3] = (Math.random() - 0.5) * 20;
-      positions[i * 3 + 1] = (Math.random() - 0.5) * 14;
-      positions[i * 3 + 2] = (Math.random() - 0.5) * 8;
-      speeds[i] = 0.1 + Math.random() * 0.3;
-      offsets[i] = Math.random() * Math.PI * 2;
+      positions[i * 3] = (seededUnit(i, 1) - 0.5) * 20;
+      positions[i * 3 + 1] = (seededUnit(i, 2) - 0.5) * 14;
+      positions[i * 3 + 2] = (seededUnit(i, 3) - 0.5) * 8;
+      speeds[i] = 0.1 + seededUnit(i, 4) * 0.3;
+      offsets[i] = seededUnit(i, 5) * Math.PI * 2;
     }
     return { positions, speeds, offsets };
   }, []);
@@ -76,9 +81,9 @@ function FloatingDust() {
   const positions = useMemo(() => {
     const arr = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
-      arr[i * 3] = (Math.random() - 0.5) * 25;
-      arr[i * 3 + 1] = (Math.random() - 0.5) * 18;
-      arr[i * 3 + 2] = (Math.random() - 0.5) * 10;
+      arr[i * 3] = (seededUnit(i, 11) - 0.5) * 25;
+      arr[i * 3 + 1] = (seededUnit(i, 12) - 0.5) * 18;
+      arr[i * 3 + 2] = (seededUnit(i, 13) - 0.5) * 10;
     }
     return arr;
   }, []);
