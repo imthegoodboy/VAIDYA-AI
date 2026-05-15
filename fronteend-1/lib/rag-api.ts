@@ -9,6 +9,13 @@ export type SourceItem = {
   rank?: number
   source?: string
   source_type?: string | null
+  title?: string | null
+  book_title?: string | null
+  section_title?: string | null
+  page_start?: number | string | null
+  page_end?: number | string | null
+  retrieval?: string | null
+  score?: number | null
   snippet?: string
   type?: string
   upload_id?: string
@@ -22,6 +29,7 @@ export type MessageItem = {
   id: string
   role: "user" | "assistant"
   content: string
+  position?: number | null
   sources?: SourceItem[] | null
   created_at: string
 }

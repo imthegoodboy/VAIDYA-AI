@@ -68,6 +68,24 @@ class TestSeparateAgents(unittest.TestCase):
         )
         self.assertEqual(result.retrieval_query, "amla benefits")
 
+    def test_rag_answer_retries_when_citations_are_missing(self) -> None:
+        with patch.object(
+            rag_answer,
+            "complete_chat",
+            side_effect=[
+                "Agni is digestive fire.",
+                "Agni is described as digestive fire in the retrieved text [1].",
+            ],
+        ) as complete:
+            answer = rag_answer.run(
+                [{"role": "user", "content": "What is Agni?"}],
+                None,
+                "--- Source [1] | title=Charaka ---\nAgni (Digestive Fire/ Metabolism)",
+                "en",
+            )
+        self.assertIn("[1]", answer)
+        self.assertEqual(complete.call_count, 2)
+
     def test_prescription_keywords_are_python_agent_logic(self) -> None:
         self.assertTrue(prescription_intent.keyword_match("Can I take this 5 mg tablet?"))
         self.assertFalse(prescription_intent.keyword_match("Tell me about tulsi leaves"))

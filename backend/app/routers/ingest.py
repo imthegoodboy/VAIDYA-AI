@@ -16,6 +16,9 @@ class IngestResponse(BaseModel):
     chunks: int
     raw_sources: int | None = None
     data_dir: str | None = None
+    book_sources: int | None = None
+    book_chunks: int | None = None
+    books_dir: str | None = None
     message: str | None = None
 
 

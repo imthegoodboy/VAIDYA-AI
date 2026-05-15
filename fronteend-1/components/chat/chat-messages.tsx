@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { Leaf, Sparkles, MessageSquare, BookOpen, Heart, Search, Brain, ShieldCheck, Copy, Check } from "lucide-react";
+import { Leaf, Sparkles, MessageSquare, BookOpen, Heart, Copy, Check, ChevronDown } from "lucide-react";
 import { fetchAuthedBlob, type AgentStep, type MessageItem, type SourceItem, type UnsplashPhoto } from "@/lib/rag-api";
 import { MarkdownRenderer } from "@/components/chat/markdown-renderer";
 
@@ -40,37 +40,16 @@ const suggestions = [
 ];
 
 function TypingIndicator({ agentSteps }: { agentSteps: AgentStep[] }) {
-  const iconForStep = (key: string) => {
-    if (key === "safety") return ShieldCheck;
-    if (key === "answer") return Sparkles;
-    if (key === "compare") return Brain;
-    if (key === "context") return Search;
-    return Brain;
-  };
-  const steps = agentSteps.length ? agentSteps : [
-    { key: "understand", label: "Reading your question" },
-    { key: "context", label: "Searching knowledge" },
-    { key: "answer", label: "Preparing answer" },
-  ];
+  void agentSteps;
   return (
     <div className="flex items-start gap-3 msg-enter">
       <div className="w-8 h-8 rounded-full bg-ayur-gold/15 flex items-center justify-center flex-shrink-0">
         <Leaf className="w-4 h-4 text-ayur-gold" />
       </div>
-      <div className="bg-chat-ai-bg rounded-2xl rounded-tl-sm px-4 py-3 space-y-3 min-w-[260px]">
+      <div className="bg-chat-ai-bg rounded-2xl rounded-tl-sm px-4 py-3">
         <div className="flex items-center gap-2 text-sm text-foreground/90">
           <span className="w-2 h-2 rounded-full bg-ayur-gold animate-pulse" />
           Vaidya is thinking
-        </div>
-        <div className="grid gap-2">
-          {steps.map((step) => {
-            const StepIcon = iconForStep(step.key);
-            return (
-            <div key={step.key} className="flex items-center gap-2 text-xs text-muted-foreground">
-              <StepIcon className="w-3.5 h-3.5 text-ayur-gold/70" />
-              <span>{step.label}</span>
-            </div>
-          )})}
         </div>
       </div>
     </div>
@@ -137,6 +116,101 @@ function UnsplashStrip({ photos }: { photos: UnsplashPhoto[] }) {
   );
 }
 
+function SourceReferences({ sources }: { sources: SourceItem[] }) {
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [expandedSourceKey, setExpandedSourceKey] = useState<string | null>(null);
+
+  if (!sources.length) return null;
+
+  const pageLabel = (source: SourceItem) => {
+    if (!source.page_start) return "";
+    if (!source.page_end || source.page_end === source.page_start) return `p. ${source.page_start}`;
+    return `pp. ${source.page_start}-${source.page_end}`;
+  };
+
+  const cleanSnippet = (snippet?: string) => (snippet || "").replace(/\s+/g, " ").trim();
+
+  return (
+    <div className="space-y-2 pt-1">
+      <button
+        type="button"
+        onClick={() => {
+          setSourcesOpen((open) => !open);
+          setExpandedSourceKey(null);
+        }}
+        className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[10px] uppercase tracking-wide transition-colors ${
+          sourcesOpen
+            ? "border-ayur-gold/30 bg-ayur-gold/10 text-ayur-gold"
+            : "border-white/10 bg-white/[0.03] text-muted-foreground hover:text-foreground hover:bg-white/[0.05]"
+        }`}
+        aria-expanded={sourcesOpen}
+      >
+        <BookOpen className="w-3 h-3" />
+        Sources ({sources.length})
+        <ChevronDown className={`h-3 w-3 transition-transform ${sourcesOpen ? "rotate-180" : ""}`} />
+      </button>
+      {sourcesOpen && (
+      <div className="grid gap-2 rounded-lg border border-white/10 bg-black/20 p-2">
+        {sources.slice(0, 5).map((source, index) => {
+          const title = source.title || source.book_title || source.source || "Indexed source";
+          const page = pageLabel(source);
+          const snippet = cleanSnippet(source.snippet);
+          const sourceKey = `${source.rank || index}-${title}-${page}-${source.source || ""}`;
+          const expanded = expandedSourceKey === sourceKey;
+          return (
+            <div key={sourceKey} className={`rounded-lg border px-3 py-2 transition-colors ${expanded ? "border-ayur-gold/30 bg-ayur-gold/[0.045]" : "border-white/10 bg-white/[0.03]"}`}>
+              <button
+                type="button"
+                onClick={() => setExpandedSourceKey((current) => current === sourceKey ? null : sourceKey)}
+                className="w-full text-left"
+                aria-expanded={expanded}
+                aria-label={`Toggle source ${source.rank || index + 1}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-foreground/90">
+                      <span className="font-medium truncate">[{source.rank || index + 1}] {title}</span>
+                      {page && <span className="text-muted-foreground">{page}</span>}
+                      {source.retrieval && <span className="text-[10px] text-ayur-gold/80">{source.retrieval}</span>}
+                    </div>
+                    {source.section_title && source.section_title !== title && (
+                      <p className="mt-1 text-[11px] text-muted-foreground truncate">{source.section_title}</p>
+                    )}
+                    {snippet && !expanded && (
+                      <p className="mt-1 line-clamp-1 text-[11px] leading-relaxed text-muted-foreground">
+                        {snippet}
+                      </p>
+                    )}
+                  </div>
+                  <ChevronDown className={`mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-muted-foreground transition-transform ${expanded ? "rotate-180 text-ayur-gold" : ""}`} />
+                </div>
+              </button>
+              {expanded && (
+                <div className="mt-3 border-t border-white/10 pt-3 text-[11px] leading-relaxed text-foreground/80">
+                  <div className="flex flex-wrap gap-1.5 pb-2">
+                    {source.source_type && <span className="rounded-md bg-white/[0.06] px-2 py-1 text-muted-foreground">{source.source_type}</span>}
+                    {source.book_title && source.book_title !== title && <span className="rounded-md bg-white/[0.06] px-2 py-1 text-muted-foreground">{source.book_title}</span>}
+                    {source.score !== null && source.score !== undefined && <span className="rounded-md bg-white/[0.06] px-2 py-1 text-muted-foreground">Score {source.score.toFixed(3)}</span>}
+                  </div>
+                  {snippet ? (
+                    <p className="whitespace-pre-wrap">{snippet}</p>
+                  ) : (
+                    <p className="text-muted-foreground">No snippet available for this source.</p>
+                  )}
+                  {source.source && source.source !== title && (
+                    <p className="mt-2 break-words text-[10px] text-muted-foreground">{source.source}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      )}
+    </div>
+  );
+}
+
 function MessageActions({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
 
@@ -161,6 +235,7 @@ function MessageActions({ text }: { text: string }) {
 function MessageBubble({ message, token, photos }: { message: ChatMessage; token: string; photos?: UnsplashPhoto[] }) {
   const isUser = message.role === "user";
   const attachments = (message.sources || []).filter((source) => source.type === "attachment");
+  const references = !isUser ? (message.sources || []).filter((source) => source.type !== "attachment") : [];
 
   return (
     <div className={`flex items-start gap-3 msg-enter ${isUser ? "flex-row-reverse" : ""}`}>
@@ -188,6 +263,7 @@ function MessageBubble({ message, token, photos }: { message: ChatMessage; token
         <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${isUser ? "bg-chat-user-bg rounded-tr-sm text-foreground whitespace-pre-wrap" : "bg-chat-ai-bg rounded-tl-sm text-foreground/90"}`}>
           {isUser ? message.content : <MarkdownRenderer content={message.content} />}
         </div>
+        {!isUser && <SourceReferences sources={references} />}
         {!isUser && <MessageActions text={message.content} />}
 
         <p className={`text-[10px] text-muted-foreground/50 font-mono px-1 ${isUser ? "text-right" : ""}`}>

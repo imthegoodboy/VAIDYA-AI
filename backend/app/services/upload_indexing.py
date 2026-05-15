@@ -29,7 +29,9 @@ class UploadIndexingService:
                 "source_type": "upload",
                 "session_id": str(session_id),
                 "upload_id": str(upload_id),
+                "title": original_filename,
+                "chunk_index": c.index,
             }
-            for _ in texts
+            for c in chunks
         ]
         chroma_store.upsert_chunks(texts, metadatas, vectors)

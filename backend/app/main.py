@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -15,6 +16,24 @@ def _cors_origins() -> list[str]:
     return [origin for origin in origins if origin]
 
 
+def _warm_chat_dependencies() -> None:
+    try:
+        from app import chroma_store, lexical_store
+        from app.embeddings import warm_embedding_model
+
+        chroma_store.get_collection().count()
+        lexical_store.count_rows()
+        warm_embedding_model()
+        logging.info("Chat dependencies warmed")
+    except Exception as e:
+        logging.info("Chat dependency warmup skipped: %s", e)
+
+
+async def _warm_chat_dependencies_later() -> None:
+    await asyncio.sleep(2)
+    await asyncio.to_thread(_warm_chat_dependencies)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     settings.data_dir.mkdir(parents=True, exist_ok=True)
@@ -25,6 +44,7 @@ async def lifespan(_: FastAPI):
         init_db()
     except Exception as e:
         logging.warning("Database init skipped or failed: %s", e)
+    asyncio.create_task(_warm_chat_dependencies_later())
     yield
 
 

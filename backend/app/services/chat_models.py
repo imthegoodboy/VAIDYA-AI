@@ -35,6 +35,7 @@ def message_to_response(row: ChatMessage) -> dict[str, Any]:
         "id": str(row.id),
         "role": row.role,
         "content": row.content,
+        "position": row.position,
         "sources": row.sources_json,
         "created_at": row.created_at,
     }

@@ -7,6 +7,10 @@ def _default_data_dir() -> Path:
     return Path(__file__).resolve().parent.parent.parent / "data"
 
 
+def _default_books_dir() -> Path:
+    return Path(__file__).resolve().parent.parent.parent / "books"
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -21,13 +25,20 @@ class Settings(BaseSettings):
     # Local CPU embeddings for host-based development and ingest.
     embedding_model: str = "paraphrase-multilingual-MiniLM-L12-v2"
     data_dir: Path = _default_data_dir()
+    books_dir: Path = _default_books_dir()
+    lexical_index_path: Path = Path("../vector_store/rag_fts.sqlite3")
 
     redis_url: str = ""
     embedding_cache_ttl_seconds: int = 86_400
 
     chunk_size: int = 800
     chunk_overlap: int = 120
+    book_chunk_size: int = 1600
+    book_chunk_overlap: int = 220
     retrieval_top_k: int = 8
+    retrieval_candidate_k: int = 48
+    retrieval_rrf_k: int = 60
+    retrieval_context_max_chars: int = 14_000
     max_url_bytes: int = 2_000_000
     url_fetch_timeout: float = 60.0
 

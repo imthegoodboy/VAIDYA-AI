@@ -10,5 +10,6 @@ class RetrievalService:
         self,
         primary_query: str,
         secondary_query: str | None,
+        session_id: str | None = None,
     ) -> tuple[str, list[dict[str, Any]]]:
-        return retrieve_context_merged(primary_query, secondary_query)
+        return retrieve_context_merged(primary_query, secondary_query, session_id=session_id)

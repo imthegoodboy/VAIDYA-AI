@@ -6,6 +6,7 @@ from typing import Any
 
 from app.chunking import chunk_text
 from app.config import settings
+from app.ingest.books import load_book_chunks
 from app.embeddings import embed_texts
 from app.ingest.loaders import (
     discover_file_sources,
@@ -94,18 +95,33 @@ def run_ingest(clear: bool = False, url_limit: int | None = None) -> dict[str, A
             all_docs.append(ch.text)
             all_meta.append(m)
 
+    book_chunks = load_book_chunks(
+        settings.books_dir.resolve(),
+        settings.book_chunk_size,
+        settings.book_chunk_overlap,
+    )
+    for ch in book_chunks:
+        all_docs.append(ch.text)
+        all_meta.append(_clean_metadata(ch.metadata))
+
     if not all_docs:
         return {
             "chunks": 0,
             "message": "No documents ingested",
             "raw_sources": 0,
             "data_dir": str(data_dir),
+            "book_sources": 0,
+            "book_chunks": 0,
         }
 
     embeddings = embed_texts(all_docs)
     chroma_store.upsert_chunks(all_docs, all_meta, embeddings)
+    book_source_count = len({str(ch.metadata.get("source")) for ch in book_chunks})
     return {
         "chunks": len(all_docs),
         "raw_sources": len(raw),
         "data_dir": str(data_dir),
+        "book_sources": book_source_count,
+        "book_chunks": len(book_chunks),
+        "books_dir": str(settings.books_dir.resolve()),
     }

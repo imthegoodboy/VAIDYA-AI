@@ -73,7 +73,7 @@ def load_herb_documents(herb_json_path: Path) -> list[tuple[str, dict[str, Any]]
     if not isinstance(data, list):
         return []
     out: list[tuple[str, dict[str, Any]]] = []
-    for item in data:
+    for index, item in enumerate(data):
         if not isinstance(item, dict):
             continue
         name = str(item.get("name", "unknown"))
@@ -82,6 +82,7 @@ def load_herb_documents(herb_json_path: Path) -> list[tuple[str, dict[str, Any]]
             "source": str(herb_json_path),
             "source_type": "herb_json",
             "herb_name": name,
+            "record_index": index,
         }
         out.append((text, meta))
     return out

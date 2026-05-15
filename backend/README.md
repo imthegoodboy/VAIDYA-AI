@@ -4,6 +4,8 @@ FastAPI RAG backend for Vaidya AI.
 
 It handles Clerk auth, user-owned chat sessions, Chroma retrieval, OpenAI chat and vision agents, plant image detection, prescription or document uploads, Tavily verification, chat history, and optional Redis query caching.
 
+Chat data is separated by Clerk user and session. Messages are ordered with a per-session `position`, uploads are scoped to their session, and session memory is stored in the separate `chat_session_memory` table. See `../docs/chat-session-memory.md` before changing chat, memory, uploads, or history.
+
 ## Setup
 
 ```powershell
@@ -25,6 +27,7 @@ The default `.env.example` uses local SQLite:
 ```env
 DATABASE_URL=sqlite:///./ragchat.db
 CHROMA_PATH=../vector_store
+LEXICAL_INDEX_PATH=../vector_store/rag_fts.sqlite3
 OPENAI_API_KEY=
 CLERK_ISSUER=
 ```
@@ -55,6 +58,8 @@ If you use another port, update `NEXT_PUBLIC_API_BASE_URL` in `fronteend-1/.env.
 .\.venv\Scripts\python -m app.ingest_cli --clear --url-limit 0
 ```
 
+This indexes local herb data and local `../books/*/*.pdf` files. Each book folder can include a `contain.md` guide; it is stored as chunk context so retrieval knows what the book is best for.
+
 Use this for the full URL list from `data/Linkss.txt`:
 
 ```powershell
@@ -70,6 +75,7 @@ GET  /sessions/
 POST /sessions/
 GET  /sessions/{id}/messages
 GET  /sessions/{id}/uploads
+GET  /sessions/{id}/uploads/{upload_id}/file
 POST /sessions/{id}/uploads
 POST /sessions/{id}/chat/
 ```

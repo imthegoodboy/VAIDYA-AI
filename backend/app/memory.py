@@ -6,7 +6,7 @@ from collections.abc import Callable
 from typing import Any, Protocol
 
 from app.config import settings
-from app.models.chat import ChatSession
+from app.models.chat import ChatSession, ChatSessionMemory
 
 logger = logging.getLogger(__name__)
 
@@ -52,14 +52,27 @@ class MemoryStore(Protocol):
 
 class PostgresSummaryMemoryStore:
     def get_summary(self, session: ChatSession) -> str | None:
-        return session.summary_text
+        memory_record = getattr(session, "memory_record", None)
+        if memory_record and memory_record.summary_text:
+            return memory_record.summary_text
+        return getattr(session, "summary_text", None)
 
     def merge_summary_delta(self, session: ChatSession, delta: str) -> str | None:
-        combined = ((session.summary_text or "").strip() + "\n" + delta.strip()).strip()
+        delta = delta.strip()
+        if not delta:
+            return self.get_summary(session)
+
+        combined = ((self.get_summary(session) or "").strip() + "\n" + delta).strip()
         if len(combined) > settings.session_summary_max_chars:
             combined = combined[-settings.session_summary_max_chars :]
-        session.summary_text = combined or None
-        return session.summary_text
+        if not hasattr(session, "memory_record"):
+            session.summary_text = combined or None
+            return session.summary_text
+        if session.memory_record is None:
+            session.memory_record = ChatSessionMemory()
+        session.memory_record.summary_text = combined or None
+        session.summary_text = None
+        return session.memory_record.summary_text
 
 
 def _normalize_memory_text(text: str) -> str:

@@ -212,6 +212,7 @@ class ChatAgentGraph:
                 self.retrieval.retrieve,
                 plan.query,
                 upload_ctx.secondary_query,
+                str(session_id),
             )
             verify_future = None
             if state.get("needs_verification"):
@@ -240,7 +241,11 @@ class ChatAgentGraph:
         plan = state["plan"]
 
         with traced_stage(trace_id, session_id, "chat.agent.retrieve"):
-            context, sources = self.retrieval.retrieve(plan.query, upload_ctx.secondary_query)
+            context, sources = self.retrieval.retrieve(
+                plan.query,
+                upload_ctx.secondary_query,
+                str(session_id),
+            )
             state["tool_steps"] += 1
 
         if state.get("needs_verification") and state["tool_steps"] < 3:

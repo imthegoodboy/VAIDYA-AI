@@ -23,6 +23,13 @@ class SourceItem(BaseModel):
     rank: int
     source: str
     source_type: str | None = None
+    title: str | None = None
+    book_title: str | None = None
+    section_title: str | None = None
+    page_start: int | str | None = None
+    page_end: int | str | None = None
+    retrieval: str | None = None
+    score: float | None = None
     snippet: str
 
 

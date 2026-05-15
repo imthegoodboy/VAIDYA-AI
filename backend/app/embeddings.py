@@ -29,3 +29,7 @@ def embed_texts(texts: list[str], batch_size: int = 32) -> list[list[float]]:
 
 def embed_query(text: str) -> list[float]:
     return embed_texts([text], batch_size=1)[0]
+
+
+def warm_embedding_model() -> None:
+    embed_query("warmup")

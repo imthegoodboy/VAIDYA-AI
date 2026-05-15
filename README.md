@@ -73,6 +73,27 @@ CLERK_JWKS_URL=
 
 New chats get a useful name from the first message. Uploads can include plant images, medicine photos, PDFs, text files, and markdown files.
 
+Chat history, messages, uploads, and memory are isolated by Clerk user and by chat session. Each message has a stable per-session position, and each chat has its own memory summary record so one conversation cannot bleed into another. See [docs/chat-session-memory.md](docs/chat-session-memory.md) for the full flow and verification checklist.
+
+## RAG Index
+
+The backend ingests three source groups:
+
+```text
+data/herb-database-main/.../herb.json  structured herb records
+data/Linkss.txt                        optional URL text sources
+books/*/*.pdf                          book PDFs with optional contain.md guide files
+```
+
+Book PDFs are chunked page-by-page with book title, page, section, and `contain.md` context. Rebuild the full local index after adding or changing books:
+
+```powershell
+cd backend
+.\.venv\Scripts\python -m app.ingest_cli --clear
+```
+
+Use `--url-limit 0` only when you intentionally want to skip URL ingestion.
+
 ## Backend
 
 FastAPI handles:
@@ -88,13 +109,7 @@ Upload jobs
 Tavily verification
 Chat history
 Chroma indexing
+SQLite FTS/BM25 lexical indexing for hybrid retrieval
 ```
 
-## Folders
-
-```text
-backend      FastAPI RAG backend
-fronteend-1  Active Next.js frontend
-data         Source documents
-vector_store Chroma database
-```
+ 

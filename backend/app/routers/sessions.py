@@ -50,6 +50,7 @@ class MessageItem(BaseModel):
     id: str
     role: str
     content: str
+    position: int | None = None
     sources: list[dict] | None = None
     created_at: datetime
 
@@ -80,6 +81,13 @@ class SourceItem(BaseModel):
     rank: int
     source: str
     source_type: str | None = None
+    title: str | None = None
+    book_title: str | None = None
+    section_title: str | None = None
+    page_start: int | str | None = None
+    page_end: int | str | None = None
+    retrieval: str | None = None
+    score: float | None = None
     snippet: str
 
 
@@ -126,16 +134,7 @@ def list_sessions(
     db: Session = Depends(get_db),
     limit: int = 50,
 ):
-    stmt = (
-        select(ChatSession)
-        .where(
-            ChatSession.clerk_user_id == auth_user.clerk_user_id,
-            ChatSession.messages.any(),
-        )
-        .order_by(ChatSession.updated_at.desc(), ChatSession.created_at.desc())
-        .limit(min(limit, 100))
-    )
-    rows = db.scalars(stmt).all()
+    rows = chat_repo.list_sessions_for_user(db, auth_user.clerk_user_id, limit)
     return [
         SessionListItem(
             id=str(r.id),
@@ -187,6 +186,7 @@ def get_messages(
             id=str(m.id),
             role=m.role,
             content=m.content,
+            position=m.position,
             sources=m.sources_json,
             created_at=m.created_at,
         )
