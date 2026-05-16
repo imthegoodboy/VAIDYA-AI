@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.chat import ChatMessage, ChatSession
@@ -60,10 +60,19 @@ class ChatRepository:
         content: str,
         sources: list[dict[str, Any]] | None = None,
     ) -> ChatMessage:
+        position = int(
+            db.scalar(
+                select(func.coalesce(func.max(ChatMessage.position), 0)).where(
+                    ChatMessage.session_id == session_id
+                )
+            )
+            or 0
+        ) + 1
         row = ChatMessage(
             session_id=session_id,
             role=role,
             content=content,
+            position=position,
             sources_json=sources,
         )
         db.add(row)
@@ -74,7 +83,11 @@ class ChatRepository:
         stmt = (
             select(ChatMessage)
             .where(ChatMessage.session_id == session_id)
-            .order_by(ChatMessage.created_at.asc())
+            .order_by(
+                ChatMessage.position.asc(),
+                ChatMessage.created_at.asc(),
+                ChatMessage.id.asc(),
+            )
         )
         return list(db.scalars(stmt).all())
 
@@ -86,7 +99,11 @@ class ChatRepository:
                 ChatMessage.session_id == session_id,
                 ChatSession.clerk_user_id == clerk_user_id,
             )
-            .order_by(ChatMessage.created_at.asc())
+            .order_by(
+                ChatMessage.position.asc(),
+                ChatMessage.created_at.asc(),
+                ChatMessage.id.asc(),
+            )
         )
 
     def load_owned_messages(
@@ -105,3 +122,20 @@ class ChatRepository:
             return
         session.title = session_title_from_message(content)
         self.touch_session(session)
+
+    def list_sessions_for_user(
+        self,
+        db: Session,
+        clerk_user_id: str,
+        limit: int = 50,
+    ) -> list[ChatSession]:
+        stmt = (
+            select(ChatSession)
+            .where(
+                ChatSession.clerk_user_id == clerk_user_id,
+                ChatSession.messages.any(),
+            )
+            .order_by(ChatSession.updated_at.desc(), ChatSession.created_at.desc())
+            .limit(min(limit, 100))
+        )
+        return list(db.scalars(stmt).all())

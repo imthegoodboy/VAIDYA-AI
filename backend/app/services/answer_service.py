@@ -14,6 +14,11 @@ class AnswerService:
         language: str | None,
         supplement: str | None,
     ) -> str:
+        if not context.strip():
+            return (
+                "I do not have enough matching information in the indexed Ayurveda "
+                "sources to answer that reliably."
+            )
         return run_rag_answer_agent(
             messages,
             session_summary,

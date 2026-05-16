@@ -6,7 +6,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from app.ingest.herb_formatter import herb_record_to_document
-from app.memory import PostgresSummaryMemoryStore
+from app.memory import (
+    PostgresSummaryMemoryStore,
+    memory_delta_for_turn,
+    should_extract_summary_delta,
+)
 from app.llm import client as llm_client
 from app.llm.agent_base import has_required_prompt_sections
 from app.llm.agents import (
@@ -64,6 +68,24 @@ class TestSeparateAgents(unittest.TestCase):
         )
         self.assertEqual(result.retrieval_query, "amla benefits")
 
+    def test_rag_answer_retries_when_citations_are_missing(self) -> None:
+        with patch.object(
+            rag_answer,
+            "complete_chat",
+            side_effect=[
+                "Agni is digestive fire.",
+                "Agni is described as digestive fire in the retrieved text [1].",
+            ],
+        ) as complete:
+            answer = rag_answer.run(
+                [{"role": "user", "content": "What is Agni?"}],
+                None,
+                "--- Source [1] | title=Charaka ---\nAgni (Digestive Fire/ Metabolism)",
+                "en",
+            )
+        self.assertIn("[1]", answer)
+        self.assertEqual(complete.call_count, 2)
+
     def test_prescription_keywords_are_python_agent_logic(self) -> None:
         self.assertTrue(prescription_intent.keyword_match("Can I take this 5 mg tablet?"))
         self.assertFalse(prescription_intent.keyword_match("Tell me about tulsi leaves"))
@@ -94,6 +116,33 @@ class TestSeparateAgents(unittest.TestCase):
         )
         self.assertIn("concise answers", result)
         self.assertIn("testing the app", result)
+
+    def test_memory_delta_can_be_extracted_on_first_personal_turn(self) -> None:
+        def fake_session_query(
+            messages: list[dict[str, object]],
+            summary: str | None,
+            fallback: str,
+        ) -> tuple[str, str]:
+            return fallback, "User's name is Parth."
+
+        delta = memory_delta_for_turn(
+            [{"role": "user", "content": "my name is Parth"}],
+            None,
+            "my name is Parth",
+            "",
+            session_query_runner=fake_session_query,
+        )
+        self.assertEqual(delta, "User's name is Parth.")
+
+    def test_memory_delta_skips_plain_first_turn_question(self) -> None:
+        self.assertFalse(should_extract_summary_delta("tell me about tulsi"))
+        delta = memory_delta_for_turn(
+            [{"role": "user", "content": "tell me about tulsi"}],
+            None,
+            "tell me about tulsi",
+            "",
+        )
+        self.assertEqual(delta, "")
 
     def test_old_agent_files_are_gone(self) -> None:
         old_agent_dir = "age" + "nts"

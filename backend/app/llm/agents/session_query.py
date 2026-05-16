@@ -19,7 +19,8 @@ Convert recent conversation and session memory into a useful document retrieval 
 - Do not answer the user's question.
 - Do not use medical or herbal knowledge as authority.
 - Replace pronouns like "it" or "that herb" with concrete names/topics when possible.
-- Keep durable memory focused on user-stated facts, preferences, names, or constraints.
+- Keep durable memory focused on stable user-stated facts: names, preferences, language, allergies, restrictions, ongoing conditions, prakriti/dosha, or other constraints.
+- Do not store one-time questions, transient symptoms, herb topics, or facts from retrieved context as durable memory.
 - If no durable new memory exists, use an empty summary_delta.
 
 ## Task Workflow

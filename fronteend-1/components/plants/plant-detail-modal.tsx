@@ -14,15 +14,20 @@ export function PlantDetailModal({ plant, onClose }: PlantDetailModalProps) {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
+    let frame = 0;
     if (plant) {
-      setCurrentImage(0);
-      requestAnimationFrame(() => setIsVisible(true));
+      frame = requestAnimationFrame(() => {
+        setCurrentImage(0);
+        setIsVisible(true);
+      });
       document.body.style.overflow = "hidden";
     } else {
-      setIsVisible(false);
       document.body.style.overflow = "";
     }
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      cancelAnimationFrame(frame);
+      document.body.style.overflow = "";
+    };
   }, [plant]);
 
   const handleClose = useCallback(() => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 
@@ -84,11 +85,13 @@ export function CtaSection() {
               </div>
 
               {/* Right image */}
-              <div className="hidden lg:flex items-end justify-center w-[600px] h-[650px] -mr-16">
-                <img
+              <div className="hidden lg:flex items-end justify-center relative w-[600px] h-[650px] -mr-16">
+                <Image
                   src="/images/bridge.png"
                   alt="Two trees connected by glowing arcs"
-                  className="w-full h-full object-contain object-bottom"
+                  fill
+                  sizes="600px"
+                  className="object-contain object-bottom"
                 />
               </div>
             </div>

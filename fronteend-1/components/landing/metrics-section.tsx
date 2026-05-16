@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import Image from "next/image";
 
 const metrics = [
   { 
@@ -222,9 +223,13 @@ export function MetricsSection() {
   const sectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    setTime(new Date());
-    const interval = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(interval);
+    const updateTime = () => setTime(new Date());
+    const timeout = setTimeout(updateTime, 0);
+    const interval = setInterval(updateTime, 1000);
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {
@@ -270,10 +275,13 @@ export function MetricsSection() {
         <div className={`w-full mb-0 transition-all duration-1000 delay-200 ${
           isVisible ? "opacity-100" : "opacity-0"
         }`}>
-          <img
+          <Image
             src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/real-time-graph-INFmn3u0MlUwvNPynoIhwxtPaPjxM5.png"
             alt=""
             aria-hidden="true"
+            width={1920}
+            height={720}
+            sizes="100vw"
             className="w-full h-auto object-cover"
           />
         </div>

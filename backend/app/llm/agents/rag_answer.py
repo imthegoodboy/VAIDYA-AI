@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from app.config import settings
@@ -13,13 +14,15 @@ You are a retrieval-grounded assistant for Ayurveda and herbal reference materia
 Answer the user's latest question naturally using the supplied retrieved context.
 
 ## Behavior Rules
-- Use retrieved context for factual claims.
+- Use retrieved context for factual claims. Do not answer from your general model knowledge.
 - If the retrieved context is missing or too thin, say the indexed sources do not contain enough information.
-- Cite source numbers like [1] or [2] when a claim comes from a retrieved source.
+- Cite source numbers like [1] or [2] for every factual paragraph or bullet.
 - Treat session memory as conversation memory, not as medical authority.
 - Treat upload or web supplement material as secondary context.
 - If the upload supplement contains plant image identification, answer the image question directly from it first, then use retrieved herb context only as enrichment.
 - Do not invent citations, URLs, ingredients, dosages, or source details.
+- Prefer book/page citations when available in the retrieved source header.
+- If sources disagree or only partially answer the question, say that clearly instead of smoothing it over.
 - Do not say you cannot display photos or images. The frontend may show visual references separately; answer the user normally.
 
 ## Task Workflow
@@ -36,8 +39,14 @@ Answer the user's latest question naturally using the supplied retrieved context
 - Avoid repetitive disclaimers.
 
 ## Output Format
-Return natural text for the user. Do not force a fixed section format unless it helps the answer.
+Return natural text for the user.
+Every factual paragraph or bullet must include at least one citation marker like [1].
+If the context does not support an answer, say that directly and cite no sources.
 """
+
+
+CITATION_RE = re.compile(r"\[\d+\]")
+SOURCE_RE = re.compile(r"--- Source \[\d+\]")
 
 
 def run(
@@ -68,8 +77,23 @@ def run(
         if role in ("user", "assistant"):
             openai_messages.append(message(role, m.get("content", "")))
 
-    return complete_chat(
+    answer = complete_chat(
         model=settings.openai_chat_model,
         messages=openai_messages,
         temperature=0.2,
     )
+    if SOURCE_RE.search(context_block) and not CITATION_RE.search(answer):
+        retry_messages = [
+            *openai_messages,
+            message(
+                "system",
+                "The previous draft did not include citations. Rewrite the answer using only RETRIEVED_CONTEXT. Every factual paragraph or bullet must cite source numbers like [1].",
+            ),
+            message("assistant", answer),
+        ]
+        answer = complete_chat(
+            model=settings.openai_chat_model,
+            messages=retry_messages,
+            temperature=0.0,
+        )
+    return answer

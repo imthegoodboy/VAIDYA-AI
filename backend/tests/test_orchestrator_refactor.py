@@ -19,6 +19,7 @@ from app.services.chat_agent_graph import ChatAgentGraph
 from app.services.chat_repository import ChatRepository, session_title_from_message
 from app.services.chat_verification import ChatVerificationService
 from app.services.chat_models import UploadContext
+from app.services.answer_service import AnswerService
 from app.services.upload_context import UploadContextService
 from app.services.upload_processing import UploadProcessingService
 
@@ -165,6 +166,16 @@ class TestOrchestrationServices(unittest.TestCase):
         ctx = UploadContextService().build_context([upload])
         self.assertIn("Tulsi", ctx.secondary_query)
         self.assertIn("Plant image identification upload", ctx.supplement_text)
+
+    def test_answer_service_refuses_empty_retrieval_context(self) -> None:
+        answer = AnswerService().answer(
+            [{"role": "user", "content": "what is unknown?"}],
+            None,
+            "",
+            None,
+            None,
+        )
+        self.assertIn("indexed Ayurveda sources", answer)
 
 
 if __name__ == "__main__":

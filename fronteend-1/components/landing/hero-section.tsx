@@ -24,8 +24,11 @@ function BlurWord({ word, trigger }: { word: string; trigger: number }) {
     framesRef.current = [];
     timersRef.current = [];
 
-    setLetterStates(letters.map(() => ({ opacity: 0, blur: 20 })));
-    setShowGradient(true);
+    const resetFrame = requestAnimationFrame(() => {
+      setLetterStates(letters.map(() => ({ opacity: 0, blur: 20 })));
+      setShowGradient(true);
+    });
+    framesRef.current.push(resetFrame);
 
     // stagger each letter
     letters.forEach((_, i) => {
@@ -109,7 +112,8 @@ export function HeroSection() {
   const [wordIndex, setWordIndex] = useState(0);
 
   useEffect(() => {
-    setIsVisible(true);
+    const frame = requestAnimationFrame(() => setIsVisible(true));
+    return () => cancelAnimationFrame(frame);
   }, []);
 
   useEffect(() => {

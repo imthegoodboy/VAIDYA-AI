@@ -7,6 +7,10 @@ def _default_data_dir() -> Path:
     return Path(__file__).resolve().parent.parent.parent / "data"
 
 
+def _default_books_dir() -> Path:
+    return Path(__file__).resolve().parent.parent.parent / "books"
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -18,16 +22,23 @@ class Settings(BaseSettings):
     ingest_token: str = ""
 
     chroma_path: Path = Path("../vector_store")
-    # Local CPU embeddings (same approach as pre-Docker ingest on the host).
+    # Local CPU embeddings for host-based development and ingest.
     embedding_model: str = "paraphrase-multilingual-MiniLM-L12-v2"
     data_dir: Path = _default_data_dir()
+    books_dir: Path = _default_books_dir()
+    lexical_index_path: Path = Path("../vector_store/rag_fts.sqlite3")
 
     redis_url: str = ""
     embedding_cache_ttl_seconds: int = 86_400
 
     chunk_size: int = 800
     chunk_overlap: int = 120
+    book_chunk_size: int = 1600
+    book_chunk_overlap: int = 220
     retrieval_top_k: int = 8
+    retrieval_candidate_k: int = 48
+    retrieval_rrf_k: int = 60
+    retrieval_context_max_chars: int = 14_000
     max_url_bytes: int = 2_000_000
     url_fetch_timeout: float = 60.0
 
@@ -35,9 +46,7 @@ class Settings(BaseSettings):
     openai_vision_model: str = "gpt-4o-mini"
     openai_plant_vision_model: str = "gpt-4.1"
 
-    database_url: str = (
-        "postgresql+psycopg://rag:rag@localhost:5432/ragchat"
-    )
+    database_url: str = "sqlite:///./ragchat.db"
     chat_history_limit: int = 20
     session_summary_max_chars: int = 2000
     chat_history_max_chars: int = 12000
@@ -52,6 +61,7 @@ class Settings(BaseSettings):
         "fda.gov,nih.gov,who.int,nlm.nih.gov,ncbi.nlm.nih.gov,medlineplus.gov"
     )
     unsplash_access_key: str = ""
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 
     clerk_issuer: str = ""
     clerk_audience: str = ""

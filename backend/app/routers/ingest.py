@@ -16,6 +16,9 @@ class IngestResponse(BaseModel):
     chunks: int
     raw_sources: int | None = None
     data_dir: str | None = None
+    book_sources: int | None = None
+    book_chunks: int | None = None
+    books_dir: str | None = None
     message: str | None = None
 
 
@@ -24,7 +27,9 @@ def ingest_endpoint(
     body: IngestRequest,
     x_ingest_token: str | None = Header(default=None, alias="X-Ingest-Token"),
 ):
-    if settings.ingest_token and x_ingest_token != settings.ingest_token:
+    if not settings.ingest_token:
+        raise HTTPException(status_code=503, detail="INGEST_TOKEN is not configured")
+    if x_ingest_token != settings.ingest_token:
         raise HTTPException(status_code=401, detail="Invalid or missing ingest token")
 
     try:

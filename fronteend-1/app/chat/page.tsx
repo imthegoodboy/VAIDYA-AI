@@ -1,20 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { SignInButton, useAuth } from "@clerk/nextjs";
-import { ChatHeader } from "@/components/chat/chat-header";
+import { ChatHeader, type ChatInteractionMode } from "@/components/chat/chat-header";
 import { ChatSidebar } from "@/components/chat/chat-sidebar";
 import { ChatMessages, fromApiMessage, type ChatMessage } from "@/components/chat/chat-messages";
 import { ChatInput } from "@/components/chat/chat-input";
+import { VoiceModePanel } from "@/components/chat/voice-mode-panel";
 import {
   ApiError,
   AUTH_EXPIRED_MESSAGE,
   deleteJson,
   getJson,
   postJson,
-  postPublicJson,
   uploadFiles,
   type MessageItem,
   type AgentStep,
@@ -84,34 +84,77 @@ function ChatApp() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const searchParams = useSearchParams();
   const herbParam = searchParams.get("herb");
-  const herbSentRef = useRef(false);
+  const herbSentRef = useRef<string | null>(null);
+  const activeSessionRef = useRef<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const silentAbortRef = useRef<AbortController | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [sessionsLoaded, setSessionsLoaded] = useState(false);
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState("");
   const [token, setToken] = useState("");
+  const [interactionMode, setInteractionMode] = useState<ChatInteractionMode>("chat");
   const [voiceReplies, setVoiceReplies] = useState(false);
+  const [isVoiceSpeaking, setIsVoiceSpeaking] = useState(false);
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const [photosByMessageId, setPhotosByMessageId] = useState<Record<string, UnsplashPhoto[]>>({});
-  const [abortController, setAbortController] = useState<AbortController | null>(null);
   const [agentSteps, setAgentSteps] = useState<AgentStep[]>([]);
 
   const speak = useCallback((text: string) => {
-    if (!voiceReplies || typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    if (interactionMode !== "voice" || !voiceReplies || typeof window === "undefined" || !("speechSynthesis" in window)) {
+      setIsVoiceSpeaking(false);
+      return;
+    }
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text.replace(/\s+/g, " ").trim());
     utterance.rate = 0.96;
     utterance.pitch = 1;
+    utterance.onstart = () => setIsVoiceSpeaking(true);
+    utterance.onend = () => setIsVoiceSpeaking(false);
+    utterance.onerror = () => setIsVoiceSpeaking(false);
     window.speechSynthesis.speak(utterance);
-  }, [voiceReplies]);
+  }, [interactionMode, voiceReplies]);
 
-  const loadToken = useCallback(async () => {
+  const handleModeChange = useCallback((mode: ChatInteractionMode) => {
+    setInteractionMode(mode);
+    if (mode === "voice") {
+      setVoiceReplies(true);
+      return;
+    }
+    setVoiceReplies(false);
+    setIsVoiceSpeaking(false);
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+  }, []);
+
+  const handleToggleVoiceReplies = useCallback(() => {
+    setVoiceReplies((enabled) => {
+      const next = !enabled;
+      if (!next && typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+        setIsVoiceSpeaking(false);
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const loadToken = useCallback(async (forceRefresh = false) => {
     if (!isLoaded || !isSignedIn) {
       throw new Error("Sign in again to load your chat history.");
     }
-    const clerkToken = await getToken({ skipCache: true });
+    const clerkToken = await getToken(forceRefresh ? { skipCache: true } : undefined);
     if (!clerkToken) throw new Error("Could not get Clerk session token");
     setToken(clerkToken);
     return clerkToken;
@@ -122,7 +165,7 @@ function ChatApp() {
       return await request(await loadToken());
     } catch (exc) {
       if (exc instanceof ApiError && exc.status === 401) {
-        return await request(await loadToken());
+        return await request(await loadToken(true));
       }
       throw exc;
     }
@@ -133,6 +176,22 @@ function ChatApp() {
     return exc instanceof Error ? exc.message : String(exc);
   }, []);
 
+  const setActiveSession = useCallback((sessionId: string | null) => {
+    activeSessionRef.current = sessionId;
+    setActiveSessionId(sessionId);
+  }, []);
+
+  const cancelActiveResponse = useCallback((showStoppedError = false) => {
+    const controller = abortControllerRef.current;
+    if (controller && !showStoppedError) {
+      silentAbortRef.current = controller;
+    }
+    controller?.abort();
+    abortControllerRef.current = null;
+    setIsTyping(false);
+    setAgentSteps([]);
+  }, []);
+
   const refreshSessions = useCallback(async (authToken: string) => {
     const list = await getJson<SessionItem[]>("/sessions/", authToken);
     setSessions(list);
@@ -141,75 +200,88 @@ function ChatApp() {
 
   const loadMessages = useCallback(async (sessionId: string, authToken: string) => {
     const rows = await getJson<MessageItem[]>(`/sessions/${sessionId}/messages`, authToken);
+    if (activeSessionRef.current !== sessionId) return rows;
     setMessages(rows.map(fromApiMessage));
     setPhotosByMessageId({});
+    return rows;
   }, []);
 
   const createSession = useCallback(async (authToken: string) => {
     const created = await postJson<{ id: string }>("/sessions/", {}, authToken);
-    setActiveSessionId(created.id);
-    setMessages([]);
-    await refreshSessions(authToken);
     return created.id;
-  }, [refreshSessions]);
+  }, []);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
     async function boot() {
       setError("");
+      setSessionsLoaded(false);
       try {
         const list = await withFreshToken((authToken) => refreshSessions(authToken));
         if (cancelled) return;
-        if (list.length > 0) {
-          setActiveSessionId(list[0].id);
+        if (herbParam) {
+          setActiveSession(null);
+          setMessages([]);
+          setPhotosByMessageId({});
+          setAgentSteps([]);
+        } else if (list.length > 0) {
+          setActiveSession(list[0].id);
           await withFreshToken((authToken) => loadMessages(list[0].id, authToken));
         } else {
-          await withFreshToken((authToken) => createSession(authToken));
+          setActiveSession(null);
+          setMessages([]);
+          setPhotosByMessageId({});
         }
       } catch (exc) {
         if (!cancelled) setError(friendlyError(exc));
+      } finally {
+        if (!cancelled) setSessionsLoaded(true);
       }
     }
     boot();
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, isSignedIn, withFreshToken, refreshSessions, loadMessages, createSession, friendlyError]);
+  }, [herbParam, isLoaded, isSignedIn, withFreshToken, refreshSessions, loadMessages, friendlyError, setActiveSession]);
 
   const handleSelectSession = useCallback(async (id: string) => {
     setError("");
+    cancelActiveResponse();
     try {
-      setActiveSessionId(id);
+      setActiveSession(id);
+      setMessages([]);
+      setPhotosByMessageId({});
       await withFreshToken((authToken) => loadMessages(id, authToken));
     } catch (exc) {
       setError(friendlyError(exc));
     }
-  }, [withFreshToken, loadMessages, friendlyError]);
+  }, [cancelActiveResponse, setActiveSession, withFreshToken, loadMessages, friendlyError]);
 
-  const handleNewChat = useCallback(async () => {
+  const handleNewChat = useCallback(() => {
+    cancelActiveResponse();
     setError("");
-    try {
-      await withFreshToken((authToken) => createSession(authToken));
-    } catch (exc) {
-      setError(friendlyError(exc));
-    }
-  }, [withFreshToken, createSession, friendlyError]);
+    setActiveSession(null);
+    setMessages([]);
+    setPhotosByMessageId({});
+    setAgentSteps([]);
+  }, [cancelActiveResponse, setActiveSession]);
 
   const handleDeleteSession = useCallback(async (id: string) => {
     if (deletingSessionId) return;
     setError("");
     setDeletingSessionId(id);
     try {
+      if (activeSessionRef.current === id) cancelActiveResponse();
       setSessions((prev) => prev.filter((session) => session.id !== id));
       await withFreshToken((authToken) => deleteJson(`/sessions/${id}`, authToken));
       const list = await withFreshToken((authToken) => refreshSessions(authToken));
       if (activeSessionId === id) {
         if (list.length > 0) {
-          setActiveSessionId(list[0].id);
+          setActiveSession(list[0].id);
           await withFreshToken((authToken) => loadMessages(list[0].id, authToken));
         } else {
-          setActiveSessionId(null);
+          setActiveSession(null);
           setMessages([]);
         }
       }
@@ -224,36 +296,37 @@ function ChatApp() {
     finally {
       setDeletingSessionId(null);
     }
-  }, [activeSessionId, withFreshToken, refreshSessions, loadMessages, deletingSessionId, friendlyError]);
+  }, [activeSessionId, cancelActiveResponse, setActiveSession, withFreshToken, refreshSessions, loadMessages, deletingSessionId, friendlyError]);
 
-  const loadUnsplashForMessage = useCallback(async (userText: string, message: ChatMessage) => {
+  const loadUnsplashForMessage = useCallback(async (sessionId: string, userText: string, message: ChatMessage) => {
     try {
-      const intent = await postPublicJson<UnsplashIntent>("/unsplash/intent", { text: `${userText}\n\n${message.content}` });
+      const intent = await withFreshToken((freshToken) =>
+        postJson<UnsplashIntent>("/unsplash/intent", { text: `${userText}\n\n${message.content}` }, freshToken)
+      );
       if (!intent.show_images || !intent.keyword) return;
-      const photos = await postPublicJson<UnsplashPhoto[]>("/unsplash/search", { keyword: intent.keyword, per_page: 3 });
-      if (photos.length) {
+      const photos = await withFreshToken((freshToken) =>
+        postJson<UnsplashPhoto[]>("/unsplash/search", { keyword: intent.keyword, per_page: 3 }, freshToken)
+      );
+      if (photos.length && activeSessionRef.current === sessionId) {
         setPhotosByMessageId((prev) => ({ ...prev, [message.id]: photos }));
       }
     } catch {
       // Unsplash is decorative; chat should stay quiet if it is unavailable.
     }
-  }, []);
+  }, [withFreshToken]);
 
   const handleStop = useCallback(() => {
-    abortController?.abort();
-    setAbortController(null);
-    setIsTyping(false);
-    setAgentSteps([]);
-  }, [abortController]);
+    cancelActiveResponse(true);
+  }, [cancelActiveResponse]);
 
-  const handleSend = useCallback(async (text: string, files?: File[]) => {
+  const handleSend = useCallback(async (text: string, files?: File[], options?: { forceNewSession?: boolean }) => {
     const content = text.trim() || (files?.length ? "Please help me with the attached file(s)." : "");
     if (!content || isTyping) return;
     setError("");
     setIsTyping(true);
     setAgentSteps(predictedSteps(content, Boolean(files?.length)));
     const controller = new AbortController();
-    setAbortController(controller);
+    abortControllerRef.current = controller;
     const optimisticId = `local-${Date.now()}`;
     const optimisticMessage: ChatMessage = {
       id: optimisticId,
@@ -268,17 +341,41 @@ function ChatApp() {
         status: "uploading",
       })),
     };
-    setMessages((prev) => [...prev, optimisticMessage]);
+    if (options?.forceNewSession) {
+      setActiveSession(null);
+      setPhotosByMessageId({});
+    }
+    setMessages((prev) => options?.forceNewSession ? [optimisticMessage] : [...prev, optimisticMessage]);
+    let sessionId = activeSessionRef.current;
     try {
-      const sessionId = activeSessionId || (await withFreshToken((freshToken) => createSession(freshToken)));
+      if (options?.forceNewSession || !sessionId) {
+        sessionId = await withFreshToken((freshToken) => createSession(freshToken));
+        if (controller.signal.aborted) {
+          throw new DOMException("Request aborted", "AbortError");
+        }
+        const newSessionId = sessionId;
+        setActiveSession(newSessionId);
+        const now = new Date().toISOString();
+        setSessions((prev) => [
+          {
+            id: newSessionId,
+            title: "New chat",
+            created_at: now,
+            updated_at: now,
+          },
+          ...prev.filter((session) => session.id !== newSessionId),
+        ]);
+      }
+      if (!sessionId) throw new Error("Could not create chat session");
+      const ensuredSessionId = sessionId;
       let uploadIds: string[] | null = null;
       if (files?.length) {
-        const uploaded = await withFreshToken((freshToken) => uploadFiles(sessionId, files, content, freshToken));
+        const uploaded = await withFreshToken((freshToken) => uploadFiles(ensuredSessionId, files, content, freshToken));
         uploadIds = uploaded.map((item) => item.id);
       }
       const response = await withFreshToken((freshToken) =>
         postJson<ChatResponse>(
-          `/sessions/${sessionId}/chat/`,
+          `/sessions/${ensuredSessionId}/chat/`,
           { content, language: null, upload_ids: uploadIds },
           freshToken,
           controller.signal
@@ -287,57 +384,93 @@ function ChatApp() {
       if (response.user_message && response.assistant_message) {
         const realUser = fromApiMessage(response.user_message as MessageItem);
         const realAssistant = fromApiMessage(response.assistant_message as MessageItem);
-        setMessages((prev) => [
-          ...prev.filter((message) => message.id !== optimisticId),
-          realUser,
-          realAssistant,
-        ]);
-        speak(realAssistant.content);
-        if (response.steps?.length) setAgentSteps(response.steps);
-        loadUnsplashForMessage(content, realAssistant);
+        if (activeSessionRef.current === ensuredSessionId) {
+          setMessages((prev) => [
+            ...prev.filter((message) => message.id !== optimisticId),
+            realUser,
+            realAssistant,
+          ]);
+          speak(realAssistant.content);
+          if (response.steps?.length) setAgentSteps(response.steps);
+          loadUnsplashForMessage(ensuredSessionId, content, realAssistant);
+        }
       } else {
-        await withFreshToken((freshToken) => loadMessages(sessionId, freshToken));
-        speak(response.answer);
+        if (activeSessionRef.current === ensuredSessionId) {
+          await withFreshToken((freshToken) => loadMessages(ensuredSessionId, freshToken));
+          speak(response.answer);
+        }
       }
       if (response.session_title) {
         setSessions((prev) => prev.map((session) =>
           session.id === sessionId ? { ...session, title: response.session_title || session.title } : session
         ));
       }
-      await withFreshToken((freshToken) => refreshSessions(freshToken));
+      void withFreshToken((freshToken) => refreshSessions(freshToken)).catch(() => undefined);
     } catch (exc) {
-      setMessages((prev) => prev.filter((message) => message.id !== optimisticId));
-      if (exc instanceof DOMException && exc.name === "AbortError") {
-        setError("Response stopped.");
-      } else {
-        setError(friendlyError(exc));
+      if (activeSessionRef.current === sessionId) {
+        setMessages((prev) => prev.filter((message) => message.id !== optimisticId));
+        if (exc instanceof DOMException && exc.name === "AbortError") {
+          if (silentAbortRef.current !== controller) {
+            setError("Response stopped.");
+          }
+        } else {
+          setError(friendlyError(exc));
+        }
       }
     } finally {
-      setIsTyping(false);
-      setAbortController(null);
-      setAgentSteps([]);
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
+      if (silentAbortRef.current === controller) {
+        silentAbortRef.current = null;
+      }
+      if (activeSessionRef.current === sessionId) {
+        setIsTyping(false);
+        setAgentSteps([]);
+      }
     }
-  }, [activeSessionId, isTyping, createSession, loadMessages, refreshSessions, speak, loadUnsplashForMessage, withFreshToken, friendlyError]);
+  }, [isTyping, setActiveSession, createSession, loadMessages, refreshSessions, speak, loadUnsplashForMessage, withFreshToken, friendlyError]);
 
   const handleSuggestionClick = useCallback((text: string) => {
     handleSend(text);
   }, [handleSend]);
 
+  const latestAssistantMessage = useMemo(() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      if (messages[index].role === "assistant") return messages[index];
+    }
+    return null;
+  }, [messages]);
+
+  const latestUserMessage = useMemo(() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      if (messages[index].role === "user") return messages[index];
+    }
+    return null;
+  }, [messages]);
+
   // Auto-send herb query when navigating from plant detail page
   useEffect(() => {
-    if (herbParam && isLoaded && isSignedIn && !herbSentRef.current && !isTyping && messages.length === 0) {
-      herbSentRef.current = true;
-      handleSend(`Tell me everything about ${herbParam} — its history, appearance, benefits, uses, and precautions.`);
+    if (herbParam && sessionsLoaded && isLoaded && isSignedIn && !isTyping && herbSentRef.current !== herbParam) {
+      herbSentRef.current = herbParam;
+      handleSend(
+        `Tell me everything about ${herbParam} — its history, appearance, benefits, uses, and precautions.`,
+        undefined,
+        { forceNewSession: true },
+      );
     }
-  }, [herbParam, isLoaded, isSignedIn, isTyping, messages.length, handleSend]);
+  }, [herbParam, sessionsLoaded, isLoaded, isSignedIn, isTyping, handleSend]);
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       <ChatHeader
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+        onNewChat={handleNewChat}
+        mode={interactionMode}
+        onModeChange={handleModeChange}
         voiceReplies={voiceReplies}
-        onToggleVoiceReplies={() => setVoiceReplies((enabled) => !enabled)}
+        onToggleVoiceReplies={handleToggleVoiceReplies}
       />
       {error && (
         <div className="relative z-40 bg-destructive/15 border-b border-destructive/30 px-4 py-2 text-sm text-red-200">
@@ -356,8 +489,22 @@ function ChatApp() {
           deletingSessionId={deletingSessionId}
         />
         <div className="flex-1 flex flex-col min-w-0">
-          <ChatMessages messages={messages} isTyping={isTyping} token={token} agentSteps={agentSteps} photosByMessageId={photosByMessageId} onSuggestionClick={handleSuggestionClick} />
-          <ChatInput onSend={handleSend} onStop={handleStop} disabled={!isLoaded || !isSignedIn} isThinking={isTyping} />
+          {interactionMode === "voice" ? (
+            <VoiceModePanel
+              onSend={handleSend}
+              onStop={handleStop}
+              disabled={!isLoaded || !isSignedIn}
+              isThinking={isTyping}
+              isSpeaking={isVoiceSpeaking}
+              latestUserMessage={latestUserMessage}
+              latestAssistantMessage={latestAssistantMessage}
+            />
+          ) : (
+            <>
+              <ChatMessages messages={messages} isTyping={isTyping} token={token} agentSteps={agentSteps} photosByMessageId={photosByMessageId} onSuggestionClick={handleSuggestionClick} />
+              <ChatInput onSend={handleSend} onStop={handleStop} disabled={!isLoaded || !isSignedIn} isThinking={isTyping} />
+            </>
+          )}
         </div>
       </div>
     </div>

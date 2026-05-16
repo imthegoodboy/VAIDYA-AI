@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import Image from "next/image";
 
 // Simple leaf/herb icon for all herbs
 const HerbIcon = () => (
@@ -74,10 +75,13 @@ export function HerbalRemediesSection() {
       <div className={`relative left-1/2 -translate-x-1/2 w-screen -mt-16 transition-all duration-1000 delay-200 ${
         isVisible ? "opacity-100" : "opacity-0"
       }`}>
-        <img
+        <Image
           src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/connection-KeJwWPQvn6l0a7C48tCARYtNEdC92H.png"
           alt=""
           aria-hidden="true"
+          width={1920}
+          height={1080}
+          sizes="100vw"
           className="w-full h-auto object-cover"
         />
       </div>

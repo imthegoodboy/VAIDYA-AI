@@ -7,7 +7,7 @@ from typing import Any, TypedDict
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.memory import get_memory_store
+from app.memory import get_memory_store, memory_delta_for_turn
 from app.models.chat import ChatMessage, ChatSession
 from app.models.session_upload import SessionUpload
 from app.services.answer_service import AnswerService
@@ -212,6 +212,7 @@ class ChatAgentGraph:
                 self.retrieval.retrieve,
                 plan.query,
                 upload_ctx.secondary_query,
+                str(session_id),
             )
             verify_future = None
             if state.get("needs_verification"):
@@ -240,7 +241,11 @@ class ChatAgentGraph:
         plan = state["plan"]
 
         with traced_stage(trace_id, session_id, "chat.agent.retrieve"):
-            context, sources = self.retrieval.retrieve(plan.query, upload_ctx.secondary_query)
+            context, sources = self.retrieval.retrieve(
+                plan.query,
+                upload_ctx.secondary_query,
+                str(session_id),
+            )
             state["tool_steps"] += 1
 
         if state.get("needs_verification") and state["tool_steps"] < 3:
@@ -284,7 +289,13 @@ class ChatAgentGraph:
         trace_id = state["trace_id"]
         session_id = state["session_id"]
         with traced_stage(trace_id, session_id, "chat.save_assistant"):
-            state["memory"].merge_summary_delta(state["session"], state["plan"].summary_delta)
+            summary_delta = memory_delta_for_turn(
+                state["trimmed_messages"],
+                state.get("session_summary"),
+                state["user_content"],
+                state["plan"].summary_delta,
+            )
+            state["memory"].merge_summary_delta(state["session"], summary_delta)
             self.repo.touch_session(state["session"])
             assistant_row = self.repo.add_message(
                 state["db"],
